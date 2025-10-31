@@ -63,8 +63,48 @@ public class ClicRaceRESTController {
 
     }
 
-    
+    @RequestMapping(path = "/{racenum}/participants/{participantnum}/position",method = RequestMethod.POST)
+    public ResponseEntity<?> updateParticipantPosition(@PathVariable(name = "racenum") String racenum,
+                                                        @PathVariable(name = "participantnum") String participantnum,
+                                                        @RequestBody RaceParticipant rp) {
+        try {
+            services.updateParticipantPosition(Integer.parseInt(racenum), Integer.parseInt(participantnum), rp.getxPosition());
+            return new ResponseEntity<>(HttpStatus.OK);
+        } catch (ServicesException ex) {
+            Logger.getLogger(ClicRaceRESTController.class.getName()).log(Level.SEVERE, null, ex);
+            return new ResponseEntity<>(ex.getLocalizedMessage(),HttpStatus.BAD_REQUEST);
+        } catch (NumberFormatException ex){
+            Logger.getLogger(ClicRaceRESTController.class.getName()).log(Level.SEVERE, null, ex);
+            return new ResponseEntity<>("Parameters must be integer values.",HttpStatus.BAD_REQUEST);
+        }
+    }
 
-    
+    @RequestMapping(path = "/{racenum}/winner",method = RequestMethod.GET)
+    public ResponseEntity<?> getWinner(@PathVariable(name = "racenum") String racenum) {
+        try {
+            return new ResponseEntity<>(services.getWinner(Integer.parseInt(racenum)),HttpStatus.OK);
+        } catch (ServicesException ex) {
+            Logger.getLogger(ClicRaceRESTController.class.getName()).log(Level.SEVERE, null, ex);
+            return new ResponseEntity<>(ex.getLocalizedMessage(),HttpStatus.NOT_FOUND);
+        } catch (NumberFormatException ex){
+            Logger.getLogger(ClicRaceRESTController.class.getName()).log(Level.SEVERE, null, ex);
+            return new ResponseEntity<>("/{racenum}/ must be an integer value.",HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @RequestMapping(path = "/{racenum}/winner",method = RequestMethod.POST)
+    public ResponseEntity<?> registerWinner(@PathVariable(name = "racenum") String racenum,
+                                            @RequestBody RaceParticipant rp) {
+        try {
+            services.registerWinner(Integer.parseInt(racenum), rp.getNumber());
+            return new ResponseEntity<>(HttpStatus.CREATED);
+        } catch (ServicesException ex) {
+            Logger.getLogger(ClicRaceRESTController.class.getName()).log(Level.SEVERE, null, ex);
+            return new ResponseEntity<>(ex.getLocalizedMessage(),HttpStatus.CONFLICT);
+        } catch (NumberFormatException ex){
+            Logger.getLogger(ClicRaceRESTController.class.getName()).log(Level.SEVERE, null, ex);
+            return new ResponseEntity<>("/{racenum}/ must be an integer value.",HttpStatus.BAD_REQUEST);
+        }
+    }
 
 }

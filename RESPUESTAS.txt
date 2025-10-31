@@ -1,0 +1,84 @@
+ANÁLISIS DE CONDICIONES DE CARRERA
+===================================
+
+1. REGIÓN CRÍTICA: Registro del Ganador
+----------------------------------------
+La región crítica principal se encuentra en el método registerWinner() del servicio ClickRaceServices.
+
+CONDICIÓN DE CARRERA:
+Cuando múltiples participantes cruzan la línea de meta (X >= 640) casi simultáneamente, varios clientes
+pueden intentar registrarse como ganador al mismo tiempo. Sin sincronización, esto podría resultar en:
+
+a) Múltiples ganadores registrados si la verificación de hasWinner() ocurre antes de setWinnerNumber()
+b) Inconsistencia en el estado del ganador entre diferentes clientes
+c) Mensajes de error inconsistentes si algunos clientes ven un ganador y otros no
+
+SOLUCIÓN IMPLEMENTADA:
+- El método registerWinner() está declarado como synchronized, garantizando acceso exclusivo
+- Se verifica primero si ya existe un ganador (hasWinner()) antes de permitir el registro
+- Si ya hay ganador, se lanza una excepción ServicesException con código HTTP 409 (CONFLICT)
+- Solo el primer cliente que obtiene el lock puede registrar el ganador
+
+
+2. REGIÓN CRÍTICA: Registro de Participantes
+----------------------------------------------
+La región crítica existe en el método registerPlayerToRace() del servicio ClickRaceServices.
+
+CONDICIÓN DE CARRERA:
+Si múltiples jugadores intentan registrarse con el mismo número simultáneamente, sin sincronización
+podría ocurrir:
+
+a) Dos jugadores con el mismo número registrados en la carrera
+b) Sobrescritura de datos de participantes
+c) Conteo incorrecto del número de participantes
+
+SOLUCIÓN IMPLEMENTADA:
+- El método registerPlayerToRace() está declarado como synchronized
+- Se verifica si el número ya existe antes de agregar el participante
+- Se utiliza ConcurrentHashMap para almacenar participantes, proporcionando seguridad adicional
+- Si el número ya está registrado, se lanza ServicesException con código HTTP 400 (BAD_REQUEST)
+
+
+3. REGIÓN CRÍTICA: Actualización de Posiciones
+------------------------------------------------
+Las actualizaciones de posición de los participantes ocurren frecuentemente durante la carrera.
+
+CONDICIÓN DE CARRERA:
+Sin la estructura de datos adecuada, las actualizaciones concurrentes de posición podrían causar:
+
+a) Pérdida de actualizaciones de posición
+b) Posiciones incorrectas mostradas en diferentes clientes
+c) Estado inconsistente del participante
+
+SOLUCIÓN IMPLEMENTADA:
+- Se utiliza ConcurrentHashMap para almacenar el mapa de participantes
+- Las operaciones de lectura/escritura en ConcurrentHashMap son thread-safe
+- Cada participante tiene su propia entrada en el mapa, reduciendo contención
+- WebSocket garantiza la difusión ordenada de mensajes a todos los clientes
+
+
+4. REGIÓN CRÍTICA: Notificación de 5 Participantes
+----------------------------------------------------
+Cuando se registra el quinto participante, todos los clientes deben ser notificados para iniciar el juego.
+
+CONDICIÓN DE CARRERA:
+Si dos participantes se registran "simultáneamente" cerca del límite de 5 participantes:
+
+a) Podría notificarse el inicio antes de que se completen todos los registros
+b) Algunos clientes podrían ver menos de 5 participantes
+
+SOLUCIÓN IMPLEMENTADA:
+- El método registerPlayerToRace() es synchronized, garantizando registro secuencial
+- La verificación de race.getParticipants().size() == 5 ocurre dentro del bloque sincronizado
+- Solo después de que el participante está completamente registrado se envía la notificación
+- ConcurrentHashMap.size() es consistente y thread-safe
+
+
+CONCLUSIÓN:
+-----------
+Las condiciones de carrera se previenen mediante:
+1. Uso del modificador synchronized en métodos críticos (registerWinner, registerPlayerToRace)
+2. Uso de estructuras de datos concurrentes (ConcurrentHashMap)
+3. Verificación de estado antes de modificaciones
+4. Manejo de excepciones apropiado con códigos HTTP descriptivos
+5. Broadcast de WebSocket para mantener todos los clientes sincronizados
